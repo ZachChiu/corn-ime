@@ -89,5 +89,13 @@ check("su3cl3← 2", "妳好")
 check("su3cl3←⌫", "好")
 check("su3cl3↓1", "你好")
 
+print("— 在中間插入")
+check("su3cl3←ji3", "你我好")
+check("su3cl3←←ji3", "我你好")
+check("su3cl3←ji3→2k7", "你我好的")
+check("su3cl3←ji3⌫", "你好")
+check("su3cl3←ok", "你ok好")
+check("su3cl3←ok", "你 ok 好", autoSpace: true)
+
 print(failed == 0 ? "\n全部通過" : "\n\(failed) 項失敗")
 exit(failed == 0 ? 0 : 1)

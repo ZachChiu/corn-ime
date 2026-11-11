@@ -169,10 +169,21 @@ final class CornEngine {
     @discardableResult
     func press(_ key: Key) -> String? {
         if cand != nil { candKey(key); return nil }
+        // 游標在中間時：先把游標後面的段落拿開，照「游標在最後面」處理完再接回去，字就會插在游標的位置
+        var after: [Seg] = []
         if cursorBack > 0 {
-            // 游標在前面時：空白開選字；其他按鍵先把游標移回最後面再照常處理
-            if key == .space { openCandidates(); return nil }
+            let c = segs.count - cursorBack
+            if c == 0 && key == .space { return nil } // 游標在最前面按空白：沒有字可以選
+            after = Array(segs[c...])
+            segs.removeSubrange(c...)
             cursorBack = 0
+        }
+        defer {
+            if !after.isEmpty {
+                segs.append(contentsOf: after)
+                cursorBack = after.count
+                normalizeSpaces()
+            }
         }
         var out = Outcome.changed
         switch key {
@@ -186,8 +197,11 @@ final class CornEngine {
         default: out = .noop
         }
         sugSel = 0
+        if case .commit(let t) = out {
+            if after.isEmpty { return t }
+            segs = [mkEn(t, open: false)] // 後面還有字：不單獨送出前半段，留在組字區
+        }
         normalizeSpaces()
-        if case .commit(let t) = out { return t }
         return nil
     }
 
@@ -650,8 +664,12 @@ final class CornEngine {
 
     /// ← → 在組字區裡移動游標（一次一個字或一個英文字），用來選前面的字
     func moveCursor(_ delta: Int) {
-        guard cand == nil, !segs.isEmpty, !isPartial(last) else { return }
-        if isOpenEn(last) { segs[segs.count - 1].open = false }
+        guard cand == nil, !segs.isEmpty else { return }
+        let i = segs.count - 1 - cursorBack // 游標前面那一段
+        if i >= 0 {
+            if isPartial(segs[i]) { return } // 注音拼到一半先不移動
+            if segs[i].t == .en { segs[i].open = false }
+        }
         cursorBack = min(segs.count, max(0, cursorBack - delta))
     }
 
@@ -782,6 +800,7 @@ final class CornEngine {
         d.boost[bk] = min((d.boost[bk] ?? 0) + 3, 12) // 學習使用者的選字
         d.saveBoost()
         cand = nil
+        cursorBack = 0 // 選完前面的字，游標回到最後面繼續打
         normalizeSpaces()
     }
 
