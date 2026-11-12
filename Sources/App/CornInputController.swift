@@ -32,7 +32,7 @@ final class CornInputController: IMKInputController {
         imeLog("activateServer → " + app + (CornData.shared.enMode ? "（英文模式）" : ""))
         // 英文模式是全部 App 共用的：切到別的 App 時提醒一下，免得以為輸入法壞了
         if CornData.shared.enMode, let client = client {
-            CandidatePanel.shared.toast("英文（輕按 Shift 切回中文）", near: caretRect(client))
+            CandidatePanel.shared.toast("英文（輕按 Shift 切回混合）", near: caretRect(client))
         }
     }
 
@@ -264,63 +264,38 @@ final class CornInputController: IMKInputController {
         client.setMarkedText(marked, selectionRange: NSRange(location: engine.cursorOffset(), length: 0),
                              replacementRange: Self.noReplace)
 
-        if let popup = popupText() {
-            CandidatePanel.shared.show(popup, near: caretRect(client))
+        if let popup = popupRows() {
+            CandidatePanel.shared.show(popup.rows, footer: popup.footer, near: caretRect(client))
         } else {
             CandidatePanel.shared.hide()
         }
     }
 
-    private func popupText() -> NSAttributedString? {
-        let font = NSFont.systemFont(ofSize: 17)
-        let small = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
-        let out = NSMutableAttributedString()
-
-        func line(_ number: String, _ text: String, selected: Bool, hint: String = "") {
-            if out.length > 0 { out.append(NSAttributedString(string: "\n")) }
-            let fg: NSColor = selected ? .selectedMenuItemTextColor : .labelColor
-            var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: fg]
-            if selected { attrs[.backgroundColor] = NSColor.selectedContentBackgroundColor }
-            if !number.isEmpty {
-                out.append(NSAttributedString(string: number + "  ", attributes: [
-                    .font: small, .foregroundColor: NSColor.secondaryLabelColor,
-                ]))
-            }
-            out.append(NSAttributedString(string: " " + text + " ", attributes: attrs))
-            if !hint.isEmpty {
-                out.append(NSAttributedString(string: "  " + hint, attributes: [
-                    .font: small, .foregroundColor: NSColor.secondaryLabelColor,
-                ]))
-            }
-        }
-
+    /// 選字窗要顯示的內容：中文選字（有數字、分頁）或英文建議（選中的那列提示 Tab）
+    private func popupRows() -> (rows: [CandidateRow], footer: String)? {
         if let c = engine.cand {
             let page = c.sel / 9
             let items = c.items[(page * 9)..<min(c.items.count, page * 9 + 9)]
-            for (offset, it) in items.enumerated() {
-                line(String(offset + 1), it.text, selected: page * 9 + offset == c.sel)
+            let rows = items.enumerated().map { offset, it in
+                CandidateRow(number: String(offset + 1), text: it.text, selected: page * 9 + offset == c.sel)
             }
             let pages = (c.items.count + 8) / 9
-            out.append(NSAttributedString(string: "\n\(page + 1)/\(pages)  空白鍵下一頁", attributes: [
-                .font: small, .foregroundColor: NSColor.secondaryLabelColor,
-            ]))
-            return out
+            return (rows, pages > 1 ? "\(page + 1)/\(pages)  空白鍵下一頁" : "")
         }
-
         let sug = engine.suggestions()
         guard !sug.isEmpty else { return nil }
         let sel = min(engine.sugSel, sug.count - 1)
-        for (i, w) in sug.enumerated() {
-            line("", w, selected: i == sel, hint: i == sel ? "Tab" : "")
+        let rows = sug.enumerated().map { i, w in
+            CandidateRow(text: w, hint: i == sel ? "Tab" : "", selected: i == sel)
         }
-        return out
+        return (rows, "")
     }
 
     /// 輕按 Shift：在中文（中英混打）和英文模式之間切換
     private func toggleMode(_ client: IMKTextInput) {
         if !engine.isEmpty { commit(client) }
         CornData.shared.enMode.toggle()
-        CandidatePanel.shared.toast(CornData.shared.enMode ? "英文" : "中文", near: caretRect(client))
+        CandidatePanel.shared.toast(CornData.shared.enMode ? "英文" : "混合", near: caretRect(client))
     }
 
     // MARK: - 選單列的輸入法選單
