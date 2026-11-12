@@ -2,3 +2,4 @@ build/
 diag.txt
 crash*.txt
 .DS_Store
+dist/

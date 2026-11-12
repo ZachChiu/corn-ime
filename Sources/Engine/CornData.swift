@@ -28,12 +28,19 @@ final class CornData {
 
     /// 使用者選字學習：「詞|讀音」→ 加分
     var boost: [String: Double]
-    var zhOnly = false
+    /// 只打注音：不自動判斷英文
+    var zhOnly = false {
+        didSet { if persist { UserDefaults.standard.set(zhOnly, forKey: "zhOnlyOn") } }
+    }
     /// 英文模式：輕按 Shift 切換，開著時按鍵全部直接交給 App
     var enMode = false
     var autoSpace: Bool {
         didSet { if persist { UserDefaults.standard.set(autoSpace, forKey: "autoSpaceOn") } }
     }
+    /// 梗圖庫：關鍵字 → 梗圖代號。由 App 填入，選字時用讀音比對
+    var memes: [(keyword: String, id: String)] = []
+    /// 每個字有哪些讀音，用來比對梗圖關鍵字（同音字也算符合）
+    var charReadings: [Character: Set<String>] = [:]
     private let persist: Bool
 
     init(zhPath: String?, enPath: String?, persist: Bool) {
@@ -41,6 +48,7 @@ final class CornData {
         if persist {
             boost = (UserDefaults.standard.dictionary(forKey: "boost") as? [String: Double]) ?? [:]
             autoSpace = (UserDefaults.standard.object(forKey: "autoSpaceOn") as? Bool) ?? true // 預設開啟
+            zhOnly = UserDefaults.standard.bool(forKey: "zhOnlyOn")
             // 專案改名前叫 ZingIME：第一次啟動時把當時學到的選字搬過來
             if boost.isEmpty,
                let old = UserDefaults.standard.persistentDomain(forName: "com.zingime.inputmethod.ZingIME"),
@@ -58,6 +66,7 @@ final class CornData {
                 let f = line.split(separator: "\t")
                 guard f.count == 3, let score = Double(f[2]) else { continue }
                 dict[String(f[0]), default: []].append((String(f[1]), score))
+                if f[1].count == 1, let ch = f[1].first { charReadings[ch, default: []].insert(String(f[0])) }
             }
         } else {
             NSLog("CornIME: 找不到注音詞庫 zh.tsv")

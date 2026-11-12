@@ -130,6 +130,11 @@ final class CornInputController: IMKInputController {
                 engine.cand = nil // 選字窗開著時繼續打字：關掉選字窗照常處理
             } else {
                 engine.candKey(key)
+                if let id = engine.pendingMeme {
+                    engine.pendingMeme = nil
+                    sendMeme(id, client)
+                    return true
+                }
                 update(client)
                 return true
             }
@@ -238,6 +243,14 @@ final class CornInputController: IMKInputController {
         tail = ch
     }
 
+    /// 選了梗圖：先把還在組字的文字送出，再把圖貼到 App
+    private func sendMeme(_ id: String, _ client: IMKTextInput) {
+        if engine.isEmpty { update(client) } else { commit(client) } // 兩邊都會清掉組字區和選字窗
+        if !MemeStore.shared.paste(id) {
+            CandidatePanel.shared.toast("已複製梗圖，按 ⌘V 貼上", near: caretRect(client))
+        }
+    }
+
     private func commit(_ client: IMKTextInput) {
         let text = engine.commitAll()
         if !text.isEmpty { insert(text, client) }
@@ -277,7 +290,10 @@ final class CornInputController: IMKInputController {
             let page = c.sel / 9
             let items = c.items[(page * 9)..<min(c.items.count, page * 9 + 9)]
             let rows = items.enumerated().map { offset, it in
-                CandidateRow(number: String(offset + 1), text: it.text, selected: page * 9 + offset == c.sel)
+                // 梗圖只顯示縮圖，不重複顯示關鍵字
+                CandidateRow(number: String(offset + 1), text: it.meme == nil ? it.text : "",
+                             selected: page * 9 + offset == c.sel,
+                             image: it.meme.flatMap { MemeStore.shared.thumbnail($0) })
             }
             let pages = (c.items.count + 8) / 9
             return (rows, pages > 1 ? "\(page + 1)/\(pages)  空白鍵下一頁" : "")
@@ -302,27 +318,16 @@ final class CornInputController: IMKInputController {
 
     override func menu() -> NSMenu! {
         let m = NSMenu()
-        let en = NSMenuItem(title: "英文模式（輕按 Shift 切換）", action: #selector(toggleEnMode(_:)), keyEquivalent: "")
-        en.state = CornData.shared.enMode ? .on : .off
-        m.addItem(en)
-        let zh = NSMenuItem(title: "只打注音（不自動判斷英文）", action: #selector(toggleZhOnly(_:)), keyEquivalent: "")
-        zh.state = CornData.shared.zhOnly ? .on : .off
-        m.addItem(zh)
-        let sp = NSMenuItem(title: "中英之間自動空格", action: #selector(toggleAutoSpace(_:)), keyEquivalent: "")
-        sp.state = CornData.shared.autoSpace ? .on : .off
-        m.addItem(sp)
+        m.addItem(NSMenuItem(title: "設定…", action: #selector(openSettings(_:)), keyEquivalent: ""))
+        m.addItem(NSMenuItem(title: "梗圖庫…", action: #selector(openMemes(_:)), keyEquivalent: ""))
         return m
     }
 
-    @objc func toggleEnMode(_ sender: Any?) {
-        CornData.shared.enMode.toggle()
+    @objc func openMemes(_ sender: Any?) {
+        MemeWindow.shared.show()
     }
 
-    @objc func toggleZhOnly(_ sender: Any?) {
-        CornData.shared.zhOnly.toggle()
-    }
-
-    @objc func toggleAutoSpace(_ sender: Any?) {
-        CornData.shared.autoSpace.toggle()
+    @objc func openSettings(_ sender: Any?) {
+        SettingsWindow.shared.show()
     }
 }

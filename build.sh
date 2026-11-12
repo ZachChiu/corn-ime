@@ -19,7 +19,7 @@ swiftc -O -module-name "$NAME" -target "$(uname -m)-apple-macos12.0" \
   -o "$APP/Contents/MacOS/$NAME"
 
 cp Info.plist "$APP/Contents/Info.plist"
-cp Resources/zh.tsv Resources/en.tsv Resources/tuxedo.tiff "$APP/Contents/Resources/"
+cp Resources/zh.tsv Resources/en.tsv Resources/tuxedo.tiff Resources/AppIcon.icns "$APP/Contents/Resources/"
 cp -R Resources/*.lproj "$APP/Contents/Resources/"   # 各語系的名稱（系統設定的選單用）
 xattr -cr "$APP"   # 清掉下載來的隔離標記
 # SIGN_ID 可指定鑰匙圈裡的簽章憑證（security find-identity -v -p codesigning）；沒指定就用 ad hoc

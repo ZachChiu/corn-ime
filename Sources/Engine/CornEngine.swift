@@ -42,7 +42,8 @@ struct Piece {
     var kind: Kind
 }
 
-struct CandItem { let text: String; let len: Int; let key: String }
+/// meme：這個選項是梗圖（代號），選了不會打出文字，而是把梗圖交給 App 貼出去
+struct CandItem { let text: String; let len: Int; let key: String; var meme: String? = nil }
 struct CandState { var items: [CandItem]; var sel: Int }
 
 /// 中英混打引擎：注音（大千鍵盤）＋英文自動判斷
@@ -67,6 +68,8 @@ final class CornEngine {
     var sugSel = 0
     /// 游標後面還有幾段（0 = 游標在最後面）。按 ← → 移動，用來選前面的字
     private(set) var cursorBack = 0
+    /// 剛選了梗圖：代號放在這裡，App 拿走後清掉
+    var pendingMeme: String? = nil
 
     init(data: CornData) { d = data }
 
@@ -760,8 +763,24 @@ final class CornEngine {
             for (p, _) in list where !seen.contains(p) {
                 seen.insert(p)
                 items.append(CandItem(text: p, len: len, key: key))
+                // 這個詞有對應的 emoji：緊接在後面列出，選了就用 emoji 取代這個詞
+                for e in emojiTable[p] ?? [] where !seen.contains(e) {
+                    seen.insert(e)
+                    items.append(CandItem(text: e, len: len, key: key))
+                }
             }
         }
+        // 梗圖：關鍵字的讀音跟游標前面的字相同就列出來（不管選到哪個同音字），排在第一個候選字後面
+        var memeItems: [CandItem] = []
+        for (kw, id) in d.memes where !memeItems.contains(where: { $0.meme == id }) {
+            let chars = Array(kw)
+            guard !chars.isEmpty, chars.count <= readings.count else { continue }
+            let tail = Array(readings.suffix(chars.count))
+            if zip(chars, tail).allSatisfy({ d.charReadings[$0]?.contains($1) ?? false }) {
+                memeItems.append(CandItem(text: kw, len: chars.count, key: tail.joined(separator: "-"), meme: id))
+            }
+        }
+        items.insert(contentsOf: memeItems, at: min(1, items.count))
         if !items.isEmpty { cand = CandState(items: items, sel: 0) }
     }
 
@@ -789,6 +808,15 @@ final class CornEngine {
         let it = c.items[idx]
         let end = segs.count - cursorBack
         guard it.len <= end else { cand = nil; return }
+        if let id = it.meme {
+            // 梗圖：把關鍵字從組字區拿掉，梗圖交給 App 貼
+            segs.removeSubrange((end - it.len)..<end)
+            pendingMeme = id
+            cand = nil
+            cursorBack = 0
+            normalizeSpaces()
+            return
+        }
         let removed = Array(segs[(end - it.len)..<end])
         var s = Seg(t: .fx)
         s.text = it.text

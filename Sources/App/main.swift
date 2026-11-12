@@ -110,5 +110,6 @@ imeLog("啟動，連線名稱 \(connectionName)")
 let server = IMKServer(name: connectionName, bundleIdentifier: bundleID)
 imeLog(server == nil ? "無法啟動 IMKServer" : "IMKServer 已啟動")
 let cornData = CornData.shared
+_ = MemeStore.shared // 載入梗圖庫，把關鍵字交給引擎
 imeLog("詞庫載入完成：注音 \(cornData.dict.count) 筆、英文 \(cornData.en.count) 筆；自動空格\(cornData.autoSpace ? "開" : "關")")
 NSApplication.shared.run()

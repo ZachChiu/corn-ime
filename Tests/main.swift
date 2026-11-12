@@ -97,5 +97,27 @@ check("su3cl3←ji3⌫", "你好")
 check("su3cl3←ok", "你ok好")
 check("su3cl3←ok", "你 ok 好", autoSpace: true)
 
+print("— emoji 候選")
+check("cl3cl3vul4↓2", "🤣")         // 好好笑 → 第 2 個選項是 emoji
+check("ji3su3cl3↓2", "我👋")        // 你好 → 👋
+
+print("— 梗圖")
+do {
+    data.memes = [(keyword: "好笑", id: "lol"), (keyword: "貓", id: "cat")]
+    func meme(_ keys: String, _ id: String?, _ rest: String) {
+        let e = CornEngine(data: data)
+        for ch in keys {
+            if ch == "↓" { e.openCandidates() } else if e.cand != nil { e.candKey(.char(ch)) } else { e.press(ch == " " ? .space : .char(ch)) }
+        }
+        let ok = e.pendingMeme == id && e.renderText() == rest
+        if !ok { failed += 1 }
+        print(ok ? "✓" : "✗", keys.padding(toLength: 28, withPad: " ", startingAt: 0), "→ 梗圖", e.pendingMeme ?? "無", "剩下「\(e.renderText())」")
+    }
+    meme("ji3cl3vul4↓2", "lol", "我")     // 我好笑 → 第 2 項是「好笑」的梗圖，關鍵字從組字區拿掉
+    meme("cl3vul4↓1", nil, "好笑")        // 第 1 項還是文字
+    meme("su3cl3↓2", nil, "👋")           // 沒有符合的關鍵字：照常選字
+    data.memes = []
+}
+
 print(failed == 0 ? "\n全部通過" : "\n\(failed) 項失敗")
 exit(failed == 0 ? 0 : 1)
